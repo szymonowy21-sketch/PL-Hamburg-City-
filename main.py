@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import requests
 import os
@@ -27,6 +28,11 @@ class MyBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        # Automatyczna rejestracja komend ukośnika w pamięci Discorda
+        await self.tree.sync()
+        print("Zsynchronizowano komendę ukośnika /ban.")
 
 bot = MyBot()
 
@@ -72,41 +78,25 @@ class BanModal(discord.ui.Modal, title='Formularz Blokady Gier (BAN)'):
         
         await interaction.channel.send(embed=embed)
 
-# Widok z przyciskiem do otwierania formularza
-class OpenBanView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        
-    @discord.ui.button(label="Otwórz formularz bana 🔨", style=discord.ButtonStyle.red, custom_id="btn_open_ban")
-    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
-        WYMAGANA_ROLA_ID = 1553090239831220324
-        ma_role = any(role.id == WYMAGANA_ROLA_ID for role in interaction.user.roles)
-        if not ma_role:
-            await interaction.response.send_message("❌ Nie posiadasz rangi moderatora, aby uzupełnić ten formularz!", ephemeral=True)
-            return
-            
-        await interaction.response.send_modal(BanModal())
-
-@bot.command(name="ban")
-async def ban_command(ctx):
+# OFICJALNA KOMENDA UKOŚNIKA /BAN
+@bot.tree.command(name="ban", description="[ADMIN] Otwiera formularz banowania")
+async def ban_command(interaction: discord.Interaction):
     WYMAGANA_ROLA_ID = 1553090239831220324
     WYMAGANY_KANAL_ID = 1566188945476292716
 
-    ma_role = any(role.id == WYMAGANA_ROLA_ID for role in ctx.author.roles)
+    # Sprawdzanie czy użytkownik ma wymaganą rolę
+    ma_role = any(role.id == WYMAGANA_ROLA_ID for role in interaction.user.roles)
     if not ma_role:
-        await ctx.send("❌ Nie posiadasz wymaganej rangi moderacyjnej!")
+        await interaction.response.send_message("❌ Nie posiadasz wymaganej rangi moderacyjnej, aby użyć tej komendy!", ephemeral=True)
         return
 
-    if ctx.channel.id != WYMAGANY_KANAL_ID:
-        await ctx.send(f"❌ Tę komendę możesz wykonać tylko na kanale <#{WYMAGANY_KANAL_ID}>!")
+    # Sprawdzanie czy komenda jest wpisana na dobrym kanale
+    if interaction.channel_id != WYMAGANY_KANAL_ID:
+        await interaction.response.send_message(f"❌ Tę komendę możesz wykonać tylko na kanale <#{WYMAGANY_KANAL_ID}>!", ephemeral=True)
         return
 
-    embed = discord.Embed(
-        title="🔨 SYSTEM BLOKAD (BAN)",
-        description="Kliknij poniższy czerwony przycisk, aby uruchomić okienko formularza nadawania bana na serwerze.",
-        color=discord.Color.red()
-    )
-    await ctx.send(embed=embed, view=OpenBanView())
+    # Bezpośrednie otwarcie formularza na ekranie
+    await interaction.response.send_modal(BanModal())
 
 keep_alive()
 bot.run(TOKEN)
